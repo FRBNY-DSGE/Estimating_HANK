@@ -1,0 +1,301 @@
+---
+title: "README"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-08-03"
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Replication Code: Estimating HANK for Central Banks
+
+NOTE: There are still a few more updates to come.
+
+The code in this repository replicates "Estimating HANK for Central
+Banks" by Sushant Acharya, William Chen, Marco Del Negro, Keshav Dogra,
+Aidan Gleich, Shlok Goyal, Ethan Matlin, Donggyu Lee, Reca Sarfati,
+Sikata Sengupta.
+
+The code is primarily designed to replicate figures and tables in the
+"Estimating HANK" paper. If you are interested in using SMC for your own
+models, check out our independent software package SMC.jl.
+
+
+First, make sure you are using the following version of our packages:
+
+-   `ClusterManagers.jl` v0.4.5
+
+-   `DSGE.jl` v1.3.0
+
+-   `ModelConstructors.jl` v0.2.5
+
+-   `SMC.jl` v0.1.15
+
+-   `StateSpaceRoutines.jl` v0.4.3
+
+To add all packages you need, enter the following into the Julia REPL,
+in the indicated order (Julia syntax is `]add PACKAGENAME`):
+
+1.  ]add DSGE\@1.3.0
+
+2.  ]add ClusterManagers\@0.4.5
+
+3.  ]add ModelConstructors\@0.2.5
+
+4.  ]add SMC\@0.1.15
+
+5.  ]add StateSpaceRoutines\@0.4.3
+
+6.  ]add CSV CategoricalArrays DataFrames DataStructures Debugger
+    Distributions FileIO HDF5 IterTools JLD2 JSON MAT MCMCDiagnostics
+    Nullables OrderedCollections Plots StatsBase StatsPlots XLSX
+
+7.  At this point, you will also need to also follow the instructions
+    [here](https://github.com/micahjsmith/FredData.jl) for setting up a
+    FRED API key.
+
+
+## Introduction
+
+This documentation details how to reproduce the results of the HANK
+project using the provided code. This document does not include
+technical details about the models or methods used. For that, please see
+the paper.
+
+Note that many of these estimations and forecasts are very
+memory-intensive. There are places in the code where you can add
+additional workers -- if you do not allocate enough memory you will
+likely see the code fail to run after a certain amount of time and a
+TaskFailedException error. Add your workers to the variable "myprocs"
+(or "my_procs" depending on the file). These will be added further in the code 
+by using the Julia built in addprocs() function.
+
+One other detail to note is that the forecast, rmse, plotting, and table code
+are all sensitive to choosing the right output files and file identifier strings
+from the step before, so being careful about this will preempt a lot of errors.
+
+Finally, for more context, each of the folders in the folder `/dsge_version` is
+a separate version of the DSGE.jl. This abstraction from github was done mostly 
+because of changes to the codebase since COVID that rendered a lot of our private 
+branches of DSGE.jl un-publishable by NY Federal Reserve Bank guidelines. An update
+to DSGE.jl is in the pipeline to account for this but for the sake of the replication
+code for this paper, the three folders `SW`, `BBL_MH_SMC`, and `BBL_7var` will
+suffice.
+
+If you need assistance with running the code, reach out to the current
+NY Fed DSGE RAs (currently Pranay Gundam: Pranay.Gundam@ny.frb.org and Brian
+Pacula: Brian.Pacula@ny.frb.org).
+
+## Data:
+
+Within the data folder, there are many subfolders.
+* `/data/input_data/raw` gives paths to inputs required for estimation, where ... (not sure if necessary so not gonna flush out)
+* `/data/input_data/data` contains necessary inputs to the full 11 variable and 7 variable hank models. DSID 01 corresponds to the 7 Variable HANK model, and DSID 1793 corresponds to the full 11 Variable HANK model.
+* `/data/output_data/` has various JLD2 files (dataf, save1, save4, scov, seven_rmse_final) - which support estimations and forecasts.
+* `/data/output_data/bayer_born_luetticke/ss1/estimate/raw` contains all raw estimation output files from Hank 7 Variable estimations.
+* `/data/output_data/hank_full/estimate/` contains all raw estimation output files from the primary HANK models
+* `/data/output_data/smets_wouters/ss0/estimate/raw` contains all raw estimation output files from SW estimations.
+* `/data/output_data/smets_wouters/ss0/estimate/work` contains () not really sure yet
+* `/data/output_data/smets_wouters/ss0/forecast/raw` contains output files from the Smets and Wouters forecasts
+* `/data/output_data/smets_wouters/ss0/forecast/work` contains MeansBand objects as outputs of SW forecasts that contain forecasted and historical data of observations, as well as their irfs.
+
+## Estimations
+
+There are three separate models estimated: the primary HANK model, the
+7-variable HANK model, and the Smets and Wouters (SW) model. We start
+with the primary model.
+
+### HANK Estimation
+
+We run two sets of estimations for the HANK model, one from scratch
+using SMC and one using BBL's original MH estimation as a prior. We
+start with the SMC estimations.
+
+1.  Run estim/hank/fullsmc.jl, ensuring that run_estimate is
+    set to true and use_bridge_cloud is set to false.
+
+2.  When this run completes, run estim/hank/fullsmc.jl again, this time with use_bridge_cloud = true (and run_estimate = true). Ensure that the load paths in the loop (lines 212 & 215) match the output estimation files.
+
+    There may be points in which the estimation stops due to running out
+    of memory. When this happens, do the following:
+
+    1.  Note the latest stage increment which was saved (it will save
+        every `intermediate_stage_increment` interval)
+    2.  set `intermed_stage` to that stage increment in the file
+    3.  Set `use_intermed_start = true`
+    4.  Save the loop file, and rebatch the estimation
+
+The first step will produce the estimation using data up to 2019Q4. The
+next step produces estimations starting with data at 2019Q3 and
+iterating backwards to 2000Q1. Each file will take a significant amount
+of time to run. Note that the keyword argument filestring_addl changes
+the name of the outputted estimation file. This can be useful to avoid
+overwriting previously existing estimation files (you do not need to
+worry about this if you are only running the code once for reproducing
+results). However, because the estimation loop uses the name of the
+previously outputted estimation file, you will need to update the load
+paths in lines 211 and 214 accordingly if you change filestring_addl.
+
+Now, we run the estimations starting from BBL's MH results:
+
+1.  Run estim/hank/mhcloud.jl with first_run = true and use_bridge_cloud = true. If you want to use a different cloud for this estimation, update that accordingly in line 194
+2.  Run estim/hank/mhcloud.jl for a second time with first_run = false and use_bridge_cloud = true, changing line 211 to load in the bridge cloud to past estimation.
+
+The notes and recommendations for the full SMC runs above apply to the
+MH runs as well.
+
+### 7-Var HANK.
+
+We need to repeat the above for the 7-variable HANK model. However, we
+do not have access to MH draws from the BBL paper, so we will only be
+running the SMC estimations. All notes above on filestrings still apply
+here.
+
+1.  Navigate to the file path `estim/hank_7var/` and open
+    `estimloop_7var.jl` to ensure that the setting `run_estimate = true`
+    (line 11) and `use_intermed_start = false` (line 25)
+2.  Run `estimloop_7var.jl`, making sure the setting run_estimate is set
+    to true.
+3.  Once that has completed, set `use_intermed_start = true` and
+    `intermed_stage` to the latest stage completed in the first run.
+4.   Rerun `estimloop_7var.jl`. This should produce the backwards
+    estimations. -- Really really unclear as of now
+5.  As with previously, if the estimation stops prematurely for any
+    reason you can resume estimation by changing `intermed_stage` to the
+    latest intermediate stage. (Unclear if we really need this
+
+### SW estimations
+
+
+The last step of the estimation process is to run the Smets-Wouter model,
+and again we need to repeat the process above. Once again, all notes on
+filestrings apply here and keeping track of the filestring_addl variable
+is important for further steps in the process.
+
+1. Navigate to the file path `estim/sw/` and open `demeaned_sw_loop.jl`.
+2. On your first run of this file, ensure that you have set the appropriate
+   `filestring_addl` variable value, `estimate_firststep = true`, and
+   `estimate_loop = true`.
+3. Once the previous estimation has successfully ran, set
+   `estimate_firststep = false`, and `estimate_loop = true`.
+
+## Forecasts
+
+In order to create the RMSEs tables and plots, you need to run the corresponding
+forecasts. Keep in mind that the forecasts reference the estimation output files
+created from the step above, so make sure you double check that the names of the
+output files being loaded match.
+
+You can located the files you need to run in order to create the forecasts in the
+'/forecasts/**Model**' folder. To create some of the plots and tables in the paper
+you will need to run the files: hank_fullsmc_forecasts.jl, mhcloud_forecasts.jl,
+sevenvar_forecasts.jl, and dm_sw_for_loop.jl in their respective folders. Running
+each of the forecasting files are very simple and similar.
+
+
+### SW forecasts
+
+The dm_sw_for_loop.jl file doesn't have many boolean toggles or settings to worry
+about. Before running, ensure:
+1. You have set the appropriate value for 'filestring_addl'
+2. run_forecasts is set to true
+3. You have set the appropriate parallel processing
+4. run the file
+
+
+### HANK forecasts
+
+There are two files you will need to worry about. Follow the instructions above
+for both mhcloud_forecasts.jl and hank_fullsmc_forecasts.jl.
+
+### 7-Var HANK forecasts
+
+Follow the instructions above for the sevenvar_forecasts.jl file.
+
+## RMSEs and Plots
+
+The RMSE calculations and plots are just a matter of pulling from the
+correct forecast files: matching the appropriate output filepaths and forecast 
+strings is very important. Ensure that you run each script in the rmse
+folder, taking note of where the files are being saved. Then run the
+appropriate files in the plots folder, making sure you are pulling
+from the correct jld2s. Note that the input datafiles for the RMSE
+calculations must be the meansbands output jld2 data files that you
+get from running a forecast.
+
+To generate RMSE calculations: 
+- **HANK Model**: You will first need to load the model that you used to create
+the corresponding forecasts. The easiest way to do this is to run mhcloud_forecasts.jl
+from the forecast instructions above but make sure to set `run_forecast = false`.
+After doing do, run the mhcloud_rmse.jl file taking note of the input data file. 
+Follow the same instructions for smc_rmse.jl.
+- **7-Var Model**: You will first need to load the model that you used to create
+the corresponding forecasts. The easiest way to do this is to run sevenvar_forecasts.jl
+from the forecast instructions above but make sure to set `run_forecast = false`.
+After doing do, run the seven_rmse.jl file taking note of the input data file. 
+- **SW**: Run the dm_sw_rmse_loop.jl file taking note of the input data file.
+
+## Making Tables and Plots:
+
+As a reminder, loading in the correct datafiles is the most important step of 
+running this code. To replicate Prior and Posterior Tables in Section 4:
+
+-   Run `/tables/hank_7var/7var_tables.jl` , adding file path references where needed and
+    `includeall.jl` file at the top.
+
+To replicate RMSE Plots in Section 4, Figure 1:
+
+-   Open `gen_plots_bblsmc_sw.jl`, change
+    the input file path at the top of the file, and change the output
+    file paths in lines 82-85 if you would like to save the figures in a
+    different file directory.
+
+-   Run `/plots/gen_plots_bblsmc_sw.jl`
+
+-   Note that each result is generated in a separate PDF.
+
+To replicate RSME Plots in Section 4, Figure 2:
+
+-   Open `/plots/gen_plots_bbl_sw.jl`, change input
+    file paths at the top of the file, and change the output file paths
+    in lines 82-85 if you would like to save the figures in a different
+    file directory.
+
+-   Run `/plots/gen_plots_bbl_sw.jl`
+
+-   Note that each result is generated in a separate PDF.
+
+
+
+# Disclaimer:
+
+Copyright Federal Reserve Bank of New York. You may reproduce, use,
+modify, make derivative works of, and distribute and this code in whole
+or in part so long as you keep this notice in the documentation
+associated with any distributed works. Neither the name of the Federal
+Reserve Bank of New York (FRBNY) nor the names of any of the authors may
+be used to endorse or promote works derived from this code without prior
+written permission. Portions of the code attributed to third parties are
+subject to applicable third party licenses and rights. By your use of
+this code you accept this license and any applicable third party
+license.
+
+THIS CODE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT ANY WARRANTIES OR
+CONDITIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT
+LIMITATION ANY WARRANTIES OR CONDITIONS OF TITLE, NON-INFRINGEMENT,
+MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, EXCEPT TO THE
+EXTENT THAT THESE DISCLAIMERS ARE HELD TO BE LEGALLY INVALID. FRBNY IS
+NOT, UNDER ANY CIRCUMSTANCES, LIABLE TO YOU FOR DAMAGES OF ANY KIND
+ARISING OUT OF OR IN CONNECTION WITH USE OF OR INABILITY TO USE THE
+CODE, INCLUDING, BUT NOT LIMITED TO DIRECT, INDIRECT, INCIDENTAL,
+CONSEQUENTIAL, PUNITIVE, SPECIAL OR EXEMPLARY DAMAGES, WHETHER BASED ON
+BREACH OF CONTRACT, BREACH OF WARRANTY, TORT OR OTHER LEGAL OR EQUITABLE
+THEORY, EVEN IF FRBNY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGES OR LOSS AND REGARDLESS OF WHETHER SUCH DAMAGES OR LOSS IS
+FORESEEABLE.
