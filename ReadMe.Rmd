@@ -73,7 +73,7 @@ memory-intensive. There are places in the code where you can add
 additional workers -- if you do not allocate enough memory you will
 likely see the code fail to run after a certain amount of time and a
 TaskFailedException error. Add your workers to the variable "myprocs"
-(or "my_procs" depending on the file). These will be added further in the code 
+(or "my_procs" depending on the file). These will be added further in the code
 by using the Julia built in addprocs() function.
 
 One other detail to note is that the forecast, rmse, plotting, and table code
@@ -81,8 +81,8 @@ are all sensitive to choosing the right output files and file identifier strings
 from the step before, so being careful about this will preempt a lot of errors.
 
 Finally, for more context, each of the folders in the folder `/dsge_version` is
-a separate version of the DSGE.jl. This abstraction from github was done mostly 
-because of changes to the codebase since COVID that rendered a lot of our private 
+a separate version of the DSGE.jl. This abstraction from github was done mostly
+because of changes to the codebase since COVID that rendered a lot of our private
 branches of DSGE.jl un-publishable by NY Federal Reserve Bank guidelines. An update
 to DSGE.jl is in the pipeline to account for this but for the sake of the replication
 code for this paper, the three folders `SW`, `BBL_MH_SMC`, and `BBL_7var` will
@@ -95,13 +95,13 @@ Pacula: Brian.Pacula@ny.frb.org).
 ## Data:
 
 Within the data folder, there are many subfolders.
-* `/data/input_data/raw` gives paths to inputs required for estimation, where ... (not sure if necessary so not gonna flush out)
+* `/data/input_data/raw` gives paths to inputs required for estimation
 * `/data/input_data/data` contains necessary inputs to the full 11 variable and 7 variable hank models. DSID 01 corresponds to the 7 Variable HANK model, and DSID 1793 corresponds to the full 11 Variable HANK model.
 * `/data/output_data/` has various JLD2 files (dataf, save1, save4, scov, seven_rmse_final) - which support estimations and forecasts.
 * `/data/output_data/bayer_born_luetticke/ss1/estimate/raw` contains all raw estimation output files from Hank 7 Variable estimations.
 * `/data/output_data/hank_full/estimate/` contains all raw estimation output files from the primary HANK models
 * `/data/output_data/smets_wouters/ss0/estimate/raw` contains all raw estimation output files from SW estimations.
-* `/data/output_data/smets_wouters/ss0/estimate/work` contains () not really sure yet
+* `/data/output_data/smets_wouters/ss0/estimate/work`
 * `/data/output_data/smets_wouters/ss0/forecast/raw` contains output files from the Smets and Wouters forecasts
 * `/data/output_data/smets_wouters/ss0/forecast/work` contains MeansBand objects as outputs of SW forecasts that contain forecasted and historical data of observations, as well as their irfs.
 
@@ -221,7 +221,7 @@ Follow the instructions above for the sevenvar_forecasts.jl file.
 ## RMSEs and Plots
 
 The RMSE calculations and plots are just a matter of pulling from the
-correct forecast files: matching the appropriate output filepaths and forecast 
+correct forecast files: matching the appropriate output filepaths and forecast
 strings is very important. Ensure that you run each script in the rmse
 folder, taking note of where the files are being saved. Then run the
 appropriate files in the plots folder, making sure you are pulling
@@ -229,21 +229,21 @@ from the correct jld2s. Note that the input datafiles for the RMSE
 calculations must be the meansbands output jld2 data files that you
 get from running a forecast.
 
-To generate RMSE calculations: 
+To generate RMSE calculations:
 - **HANK Model**: You will first need to load the model that you used to create
 the corresponding forecasts. The easiest way to do this is to run mhcloud_forecasts.jl
 from the forecast instructions above but make sure to set `run_forecast = false`.
-After doing do, run the mhcloud_rmse.jl file taking note of the input data file. 
+After doing do, run the mhcloud_rmse.jl file taking note of the input data file.
 Follow the same instructions for smc_rmse.jl.
 - **7-Var Model**: You will first need to load the model that you used to create
 the corresponding forecasts. The easiest way to do this is to run sevenvar_forecasts.jl
 from the forecast instructions above but make sure to set `run_forecast = false`.
-After doing do, run the seven_rmse.jl file taking note of the input data file. 
+After doing do, run the seven_rmse.jl file taking note of the input data file.
 - **SW**: Run the dm_sw_rmse_loop.jl file taking note of the input data file.
 
 ## Making Tables and Plots:
 
-As a reminder, loading in the correct datafiles is the most important step of 
+As a reminder, loading in the correct datafiles is the most important step of
 running this code. To replicate Prior and Posterior Tables in Section 4:
 
 -   Run `/tables/hank_7var/7var_tables.jl` , adding file path references where needed and
